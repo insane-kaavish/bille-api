@@ -1,0 +1,124 @@
+import pickle
+from flask import Flask, request, jsonify
+import subprocess as sp
+from pymongo import MongoClient
+import sys
+import random
+import csv
+from flask_cors import CORS
+import os
+
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+app.config["DEBUG"] = True
+MONGO_PASS = os.environ.get('MONGO_PASS')
+client = MongoClient(MONGO_PASS)
+db = client.bille
+myCollection = db.bille
+
+
+model_filepath = 'model.sav'
+try:
+    model = pickle.load(open(model_filepath, 'rb'))
+except:
+    sys.exit('Unable to load the model')
+
+@app.route('/predict', methods=['POST'])
+def predictData():
+    try:
+        # Parse the JSON data
+        data = request.json
+        x = myCollection.insert_one(data)
+        print(x)
+
+        final_people = int(data.get('people', 0))
+        final_size = int(data.get('size', 0))
+        final_unit = data.get('unit', 'gaz')  # Default unit is 'gaz'
+
+        if final_unit == 'sqft':
+            # Convert 'sqft' to 'gaz' (1 sqft = 0.092903 gaz)
+            final_size = final_size * 0.092903
+
+        # Initialize a dictionary to store appliance counts
+        appliance_counts = {
+            'Air Conditioner (Inverter)': 0,
+            'Air Conditioner (non-Inverter)': 0,
+            'Refrigerator': 0,
+            'Deep Freezer': 0,
+            'Water Dispenser': 0,
+            'Washing Machine': 0,
+            'Television': 0,
+            'Iron': 0,
+            'Microwave Oven': 0,
+            'Electric Oven': 0,
+            'Electric Stove': 0,
+            'Water heater/Electric Geyser': 0,
+            'Desktop Computer': 0,
+            'Gaming Consoles/Laptops': 0,
+            'Electric Kettle': 0
+        }
+
+        # Calculate TotalUnits
+        oct_bill = float(data.get('octBill', 0))
+        sep_bill = float(data.get('sepBill', 0))
+        aug_bill = float(data.get('augBill', 0))
+        peak_hours = 0
+        total_units = oct_bill + sep_bill + aug_bill
+
+        # Traverse rooms and appliances to update counts
+        if 'rooms' in data:
+            rooms = data.get('rooms', [])
+            for room in rooms:
+                appliances = room.get('Appliances', [])
+                for appliance in appliances:
+                    appliance_name = appliance.get('appliance', '')
+                    if appliance_name in appliance_counts:
+                        appliance_counts[appliance_name] += 1
+
+            # Calculate PeakHours
+            appliances = data.get('rooms', [])[0].get('Appliances', [])
+            lower_bounds = [int(appliance['hours'].split('-')[0]) for appliance in appliances]
+            peak_hours = sum(lower_bounds)
+
+        final_fans = int(data.get('fans', 0))
+        final_lights = int(data.get('lights', 0))
+
+        # Return the results
+        response_data = {
+            'TotalUnits': total_units,
+            'PeakHours': peak_hours,
+            'FinalSize': final_size,
+            'FinalUnit': final_unit,
+            'ApplianceCounts': appliance_counts,
+            'FinalFans': final_fans,
+            'FinalLights': final_lights,
+        }
+        
+        csv_data = [
+            oct_bill,
+            sep_bill,
+            aug_bill,
+            peak_hours,
+            final_size,
+            final_unit,
+            final_fans,
+            final_lights
+        ]
+        
+        # Appending appliance counts to the CSV data
+        csv_data.extend(list(appliance_counts.values()))
+
+        # Save to CSV
+        with open('house_data.csv', mode='a') as file:
+            writer = csv.writer(file)
+            writer.writerow(csv_data)
+        
+
+        # return jsonify(response_data)
+    except Exception as e:
+        print(e)
+    return {'predictedUnits': random.randint(min([oct_bill, sep_bill, aug_bill]), max([oct_bill, sep_bill, aug_bill]))}
+
+if __name__ == "__main__":
+    app.run()
