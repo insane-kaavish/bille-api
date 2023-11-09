@@ -2,12 +2,11 @@ from flask import Flask, request, jsonify
 from pymongo import MongoClient
 import random
 from flask_cors import CORS
-import os
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-MONGO_PASS = os.environ.get('MONGO_PASS')
+MONGO_PASS = "mongodb+srv://admin:CyNRpVzhYsQ0CJSE@cluster0.6sz915o.mongodb.net/?retryWrites=true&w=majority"
 client = MongoClient(MONGO_PASS)
 db = client.bille
 myCollection = db.bille
