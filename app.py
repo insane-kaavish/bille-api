@@ -7,13 +7,14 @@ import os
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
-app.config["DEBUG"] = True
 MONGO_PASS = os.environ.get('MONGO_PASS')
 client = MongoClient(MONGO_PASS)
 db = client.bille
 myCollection = db.bille
 
-
+@app.route('/', methods=['GET'])
+def home():
+    return {'message': 'Hello World!'}
 
 @app.route('/predict', methods=['POST'])
 def predictData():
