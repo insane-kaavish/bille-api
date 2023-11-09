@@ -16,7 +16,7 @@ myCollection = db.bille
 def home():
     return {'message': 'Hello World!'}
 
-@app.route('/predict', methods=['POST'])
+@app.route('/predict', methods=['POST', 'GET'])
 def predictData():
     try:
         # Parse the JSON data
